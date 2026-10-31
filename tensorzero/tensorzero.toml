@@ -10,7 +10,7 @@ routing = ["gemini", "groq_fallback"]
 
 [models.research_model.providers.gemini]
 type = "google_ai_studio_gemini"
-model_name = "gemini-3.8-flash"
+model_name = "gemini-3.5-flash"
 api_key_location = "env::GEMINI_API_KEY"
 
 [models.research_model.providers.groq_fallback]
