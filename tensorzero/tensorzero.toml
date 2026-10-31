@@ -1,0 +1,43 @@
+# TensorZero = LLM gateway. The app never talks to Gemini/Groq directly;
+# it sends POST /inference to this gateway (http://localhost:3000 inside the ECS task).
+
+[gateway]
+bind_address = "0.0.0.0:3000"
+
+[models.research_model]
+# Try Gemini first. If it fails (error, timeout, rate limit), TensorZero tries Groq.
+routing = ["gemini", "groq_fallback"]
+
+[models.research_model.providers.gemini]
+type = "google_ai_studio_gemini"
+model_name = "gemini-2.5-flash"
+api_key_location = "env::GEMINI_API_KEY"
+
+[models.research_model.providers.groq_fallback]
+type = "groq"
+model_name = "llama-3.1-8b-instant"
+api_key_location = "env::GROQ_API_KEY"
+
+# Used by Search, Summarize, Critic agents and the eval judges
+[functions.research_summarize]
+type = "chat"
+
+[functions.research_summarize.variants.primary]
+type = "chat_completion"
+model = "research_model"
+weight = 1.0
+temperature = 0.3
+max_tokens = 2000
+system_template = "templates/research_summarize_system.minijinja"
+
+# Used by the Writer agent
+[functions.report_write]
+type = "chat"
+
+[functions.report_write.variants.primary]
+type = "chat_completion"
+model = "research_model"
+weight = 1.0
+temperature = 0.5
+max_tokens = 4000
+system_template = "templates/report_write_system.minijinja"
