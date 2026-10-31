@@ -42,7 +42,8 @@ async def _judge_once(config: Config, prompt: str) -> str:
             },
         )
         r.raise_for_status()
-        return r.json()["content"][0]["text"]
+        # Gemini 3.x also returns "thought" blocks (text = None), so keep only the text blocks
+        return "".join(b["text"] for b in r.json()["content"] if b.get("type") == "text")
 
 
 @traceable(run_type="chain", name="eval:relevance")

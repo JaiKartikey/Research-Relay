@@ -51,7 +51,8 @@ async def _tz_call_once(
             },
         )
         response.raise_for_status()
-        return response.json()["content"][0]["text"]
+        # Gemini 3.x also returns "thought" blocks (text = None), so keep only the text blocks
+        return "".join(b["text"] for b in response.json()["content"] if b.get("type") == "text")
 
 
 class SearchAgent:
