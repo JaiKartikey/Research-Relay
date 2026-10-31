@@ -58,8 +58,8 @@ flowchart TD
 
     subgraph LLMs["🧠 LLM Providers"]
         direction LR
-        Gemini["🟢 Google Gemini\ngemini-2.5-flash\nPrimary"]
-        Groq["🟡 Groq\nllama-3.1-8b-instant\nFallback"]
+        Gemini["🟢 Google Gemini\ngemini-3.8-flash\nPrimary"]
+        Groq["🟡 Groq\nopenai/gpt-oss-120b\nFallback"]
     end
 
     ST["🔢 SentenceTransformer\nall-MiniLM-L6-v2\n384-dim — runs in-process"]

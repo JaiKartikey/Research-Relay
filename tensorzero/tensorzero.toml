@@ -10,12 +10,12 @@ routing = ["gemini", "groq_fallback"]
 
 [models.research_model.providers.gemini]
 type = "google_ai_studio_gemini"
-model_name = "gemini-2.5-flash"
+model_name = "gemini-3.8-flash"
 api_key_location = "env::GEMINI_API_KEY"
 
 [models.research_model.providers.groq_fallback]
 type = "groq"
-model_name = "llama-3.1-8b-instant"
+model_name = "openai/gpt-oss-120b"
 api_key_location = "env::GROQ_API_KEY"
 
 # Used by Search, Summarize, Critic agents and the eval judges
