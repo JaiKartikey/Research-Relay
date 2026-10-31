@@ -217,6 +217,8 @@ resource "aws_secretsmanager_secret_version" "config" {
     GEMINI_API_KEY            = "REPLACE_ME"
     GROQ_API_KEY              = "REPLACE_ME"
     LANGSMITH_API_KEY         = ""
+    DUCKDNS_DOMAIN            = "" # optional free name, see README "Free fixed name (DuckDNS)"
+    DUCKDNS_TOKEN             = ""
   })
 
   lifecycle {
@@ -429,7 +431,7 @@ output "instance_id" {
 }
 
 output "app_url" {
-  description = "Only right after apply. The IP changes after every Stop/Start, see the README."
+  description = "Only right after apply. The IP changes after every Stop/Start. Set up DuckDNS (README) for a name that never changes."
   value       = "http://${aws_instance.app.public_ip}"
 }
 

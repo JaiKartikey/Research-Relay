@@ -47,7 +47,7 @@ The app code is exactly the same as `Research-Relay-AWS`. Only the "where it run
 | **Redis** (container) | Semantic cache + session memory + job queue |
 | **PostgreSQL + pgvector** (container) | Long-term memory: stores reports as vectors |
 | **AWS Secrets Manager** | Holds all settings and keys; the app reads it at startup |
-| **EC2 + Docker Compose** | Runs the 4 containers on one machine |
+| **EC2 + Docker Compose** | Runs the 4 containers (+ a tiny DuckDNS updater) on one machine |
 | **LangSmith** (optional) | Traces every agent run + LLM-as-judge scores |
 | **Terraform** | Creates all AWS infrastructure |
 
@@ -70,12 +70,13 @@ Research-Relay-EC2/
 │   ├── auth.py               API key check
 │   ├── retry.py              Exponential backoff for LLM calls
 │   ├── pool.py               PostgreSQL connection pool
+│   ├── duckdns.py            Keeps your free DuckDNS name pointing at the instance's new IP
 │   └── Dockerfile
 ├── tensorzero/               Gemini first, Groq fallback (+ prompt templates)
-├── docker-compose.yml        NEW: app + tensorzero + redis + postgres on one machine
+├── docker-compose.yml        NEW: app + tensorzero + redis + postgres (+ tiny duckdns updater) on one machine
 ├── terraform/main.tf         NEW: VPC, EC2, security group, IAM role, guardrail, secret, code bucket
 ├── pyrit_dashboard/          Red team dashboard (kept, but NOT started on EC2, see the end)
-├── tests/                    22 unit tests (no AWS needed, they use fakes)
+├── tests/                    26 unit tests (no AWS needed, they use fakes)
 ├── bootstrap.sh / .bat       One-time: creates the S3 bucket for terraform state
 ├── requirements.txt          App packages
 ├── requirements-dev.txt      Test packages
@@ -206,6 +207,43 @@ The keys are read at boot. EC2 console → **Instances** → `research-relay-ec2
 
 Wait ~2 minutes, then open `http://<public IP>/health`. You should see `{"status":"ok","redis":"ok"}`. Done! 🎉
 
+### 6. (Optional, free) Get a name that never changes: DuckDNS
+
+The public IP changes on every Start. DuckDNS gives you a free name like `research-relay.duckdns.org`, and the instance tells DuckDNS its new IP on every boot (plus every 5 minutes), so **the same link always works**.
+
+**a) Make the name (on duckdns.org, 2 minutes)**
+
+1. Open https://www.duckdns.org and sign in (GitHub or Google is easiest).
+2. At the top you'll see your **token** (a long code like `a1b2c3d4-...`). Copy it. Treat it like a password.
+3. In the **sub domain** box type a name, for example `research-relay`, and click **add domain**. (If it's taken, try `research-relay-yourname`.)
+   Don't worry about the IP shown there, the instance will fix it by itself.
+
+**b) Put the name + token in Secrets Manager**
+
+AWS console → **Secrets Manager** → `research-relay/config` → **Retrieve secret value** → **Edit** → **Add row** twice:
+
+| Key | Value |
+|---|---|
+| `DUCKDNS_DOMAIN` | `research-relay` (only the first part, without `.duckdns.org`) |
+| `DUCKDNS_TOKEN` | the token from step a) |
+
+Save. (If you made the secret before DuckDNS was added, these rows aren't there yet: just add them. Terraform never overwrites your secret.)
+
+**c) Upload the new code and reboot**
+
+If your instance was created before DuckDNS was added, first get the latest code into CloudShell (step 1, e.g. `cd ~/Research-Relay && git pull`), then:
+
+```bash
+cd terraform
+./tf.sh apply      # only uploads the new code zip, the instance is NOT replaced
+```
+
+Then EC2 → **Reboot** the instance. After ~2 minutes open **http://research-relay.duckdns.org** (your name). 🎉
+
+> The token stays in Secrets Manager only. The small `duckdns` container reads it through the instance role, the same way the app reads its keys. It's never in the code, the zip or the logs.
+>
+> It's `http://` (not `https://`), same as the IP. The API key still protects the app.
+
 ---
 
 ## Daily use: Start → demo → Stop
@@ -215,7 +253,7 @@ Wait ~2 minutes, then open `http://<public IP>/health`. You should see `{"status
 1. EC2 → **Instances** → tick `research-relay-ec2`
 2. **Instance state → Start instance**
 3. Wait until **Instance state = Running** and **Status check = 2/2**, then about 1–2 more minutes for the containers
-4. Copy the **Public IPv4 address** (it's **new every time you Start**) → open `http://THAT_IP` in the browser
+4. Open **http://YOUR-NAME.duckdns.org** (if you did step 6). No DuckDNS? Copy the **Public IPv4 address** (it's **new every time you Start**) → open `http://THAT_IP`
 5. Demo time
 6. **Instance state → Stop instance**. ← don't forget this one
 
@@ -237,13 +275,13 @@ echo "http://$(aws ec2 describe-instances --instance-ids $ID \
 aws ec2 stop-instances --instance-ids $ID
 ```
 
-> Why does the IP change? A fixed IP (Elastic IP) costs money even while the instance is stopped (~$3.6/month). A changing IP is free while stopped. For demos, copying a new IP is fine.
+> Why does the IP change? A fixed IP (Elastic IP) costs money even while the instance is stopped (~$3.6/month). A changing IP is free while stopped. That's why we use DuckDNS (step 6): a free name that follows the IP.
 
 ---
 
 ## Using the App
 
-Open `http://<public IP>` in your browser, paste your API key in the key field, type a topic, pick text / PDF / JSON, click **Start Research**.
+Open `http://YOUR-NAME.duckdns.org` (or `http://<public IP>`) in your browser, paste your API key in the key field, type a topic, pick text / PDF / JSON, click **Start Research**.
 
 ### API
 
@@ -279,6 +317,7 @@ curl -X POST -H "X-API-Key: your-key" -H "Content-Type: application/json" http:/
 |---|---|
 | Change a key (Gemini, Groq, LangSmith) | Edit the secret in Secrets Manager → **Reboot** the instance |
 | Change the code | Edit the files → put the new folder in CloudShell (step 1) → `cd terraform && ./tf.sh apply` (uploads the new zip) → **Reboot** the instance |
+| Change the DuckDNS name or token | Edit `DUCKDNS_DOMAIN` / `DUCKDNS_TOKEN` in the secret → **Reboot** |
 | Allow only your own IP | `./tf.sh apply -var="allowed_cidr=YOUR_IP/32"` (find your IP at https://checkip.amazonaws.com) |
 
 ---
@@ -290,9 +329,10 @@ No SSH needed. EC2 → select the instance → **Connect** → **Session Manager
 ```bash
 sudo journalctl -u research-relay --no-pager | tail -50    # did the boot script finish?
 cd /opt/research-relay
-sudo docker compose ps                                     # are all 4 containers "running"?
+sudo docker compose ps                                     # are all containers "running"? (duckdns may show "exited" if not set up)
 sudo docker compose logs app --tail 50                     # app errors
 sudo docker compose logs tensorzero --tail 50              # Gemini / Groq errors (bad key?)
+sudo docker compose logs duckdns                           # did the DuckDNS update work?
 ```
 
 Common ones:
@@ -300,6 +340,7 @@ Common ones:
 | You see | Means |
 |---|---|
 | Browser can't connect at all | Still booting (first boot = 10–15 min), or you're using the old IP |
+| DuckDNS name doesn't open, IP works | Run `sudo docker compose logs duckdns`. `KO` = wrong token or name. `not set` = rows missing in the secret (or no Reboot). Brand-new names can take a minute to work |
 | `/health` works but research fails | Keys still `REPLACE_ME`, or you didn't Reboot after adding them |
 | `AccessDenied ... explicit deny` during apply | Your AWS Organization blocks a service. Send me the error |
 

@@ -10,6 +10,7 @@ flowchart TD
             direction LR
             API["⚡ FastAPI :8000 (host :80)\nREST API + Background Worker"]
             TZ["🔀 TensorZero :3000\nLLM Gateway"]
+            DDNS["🦆 duckdns updater\nsends new IP on boot\n+ every 5 min"]
         end
 
         subgraph SecLayer["🔒 Security — every request passes through"]
@@ -68,6 +69,8 @@ flowchart TD
     TF["🏗️ Terraform (run in CloudShell)\nVPC · EC2 · Security Group · IAM Role\nBedrock Guardrail · Secrets Manager\nS3 code bucket · S3 state"]
 
     %% ── Entry flow ────────────────────────────────────────────
+    User -->|"http://NAME.duckdns.org"| DuckDNS["🦆 DuckDNS (free)\nNAME.duckdns.org → current IP"]
+    DuckDNS -.->|"resolves to"| SG
     User -->|"HTTP :80"| SG
     SG -->|"app traffic"| Auth
     Auth --> RateL --> GIn
@@ -110,6 +113,8 @@ flowchart TD
 
     %% ── Infra ─────────────────────────────────────────────────
     API -->|"reads on startup"| Secrets
+    DDNS -->|"reads DUCKDNS_TOKEN"| Secrets
+    DDNS -->|"update IP"| DuckDNS
     S3 -->|"boot: unzip + docker compose up --build"| EC2
     Role -.->|"Secrets · Bedrock · S3"| EC2
     TF -.->|"creates all resources"| AWS
