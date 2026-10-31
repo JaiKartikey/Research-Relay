@@ -1,0 +1,16 @@
+# Only what the tests need. sentence-transformers is NOT here on purpose:
+# it pulls in PyTorch (GBs). tests/conftest.py swaps in a tiny fake model instead.
+fastapi==0.138.1
+pydantic==2.13.4
+httpx==0.28.1
+redis[hiredis]==8.0.1
+langgraph==1.2.6
+langchain-core==1.4.8
+numpy==2.5.0
+boto3==1.43.36
+asyncpg==0.31.0
+reportlab==4.2.0
+langsmith==0.9.3
+pytest==8.4.2
+pytest-asyncio==1.2.0
+fakeredis==2.32.0
