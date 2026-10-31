@@ -1,0 +1,61 @@
+# Everything that runs on the one EC2 instance.
+# The instance starts this by itself on every boot (see terraform/main.tf).
+#
+# The .env file next to this one is written on the instance at boot, from Secrets Manager.
+# It holds AWS_REGION, POSTGRES_PASSWORD, GEMINI_API_KEY, GROQ_API_KEY. Never commit it.
+
+services:
+  # FastAPI app + background worker (the worker runs inside the same process, see app/main.py)
+  app:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    ports:
+      - "80:8000" # the only port open to the internet
+    environment:
+      AWS_REGION: ${AWS_REGION} # AWS access comes from the EC2 instance role, no keys here
+    depends_on:
+      redis:
+        condition: service_started
+      tensorzero:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # LLM gateway: Gemini first, Groq if Gemini fails (tensorzero/tensorzero.toml)
+  tensorzero:
+    build:
+      context: .
+      dockerfile: tensorzero/Dockerfile
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+    restart: unless-stopped
+
+  # Semantic cache + session memory + job queue
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  # Long-term memory (pgvector). Data is saved on the EC2 disk, so it survives Stop/Start.
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: research_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: research
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U research_app -d research"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pg-data:
+  redis-data:
