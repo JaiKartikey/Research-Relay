@@ -4,272 +4,502 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Research-Relay</title>
+  <!-- marked = turns the report's Markdown into HTML. DOMPurify = removes anything unsafe from that HTML. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
   <style>
+    /* ---------- Colors (light + dark) ---------- */
+    :root {
+      --bg: #f7f5f0;          /* warm off-white page */
+      --sidebar: #efece4;
+      --card: #ffffff;
+      --text: #2b2a27;
+      --muted: #7a776f;
+      --border: #e2ded3;
+      --accent: #c96442;      /* warm terracotta */
+      --accent-hover: #b35637;
+      --user-bubble: #ebe7dc;
+      --ok: #3d8b5a;
+      --warn: #b7791f;
+      --err: #c0392b;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #262624;
+        --sidebar: #1f1e1d;
+        --card: #30302e;
+        --text: #ece9e2;
+        --muted: #a29f97;
+        --border: #3d3c39;
+        --accent: #d97757;
+        --accent-hover: #e38a6d;
+        --user-bubble: #3a3936;
+      }
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; min-height: 100vh; padding: 24px; }
-    h1 { color: #58a6ff; font-size: 1.8rem; margin-bottom: 8px; }
-    .subtitle { color: #8b949e; margin-bottom: 32px; font-size: 0.9rem; }
-    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 24px; margin-bottom: 20px; }
-    label { display: block; color: #8b949e; font-size: 0.85rem; margin-bottom: 6px; }
-    input, select, textarea { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 10px 14px; border-radius: 6px; font-size: 0.95rem; outline: none; }
-    input:focus, select:focus { border-color: #58a6ff; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-    .btn { background: #238636; color: #fff; border: none; padding: 11px 24px; border-radius: 6px; font-size: 0.95rem; cursor: pointer; font-weight: 600; }
-    .btn:hover { background: #2ea043; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-secondary { background: #21262d; border: 1px solid #30363d; }
-    .btn-secondary:hover { background: #30363d; }
-    .status { padding: 8px 14px; border-radius: 6px; font-size: 0.85rem; display: inline-block; }
-    .status-pending { background: #2d333b; color: #8b949e; }
-    .status-done { background: #1f3d2b; color: #3fb950; }
-    .status-error { background: #3d1f1f; color: #f85149; }
-    .status-blocked { background: #3d2d1f; color: #d29922; }
-    #report-box { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px; font-size: 0.9rem; line-height: 1.6; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
-    #diff-box { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 14px; font-size: 0.85rem; white-space: pre-wrap; color: #8b949e; }
-    .diff-new { color: #3fb950; }
-    .diff-removed { color: #f85149; }
-    #session-box { font-size: 0.85rem; }
-    .msg { padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; max-width: 80%; }
-    .msg-user { background: #1c2128; margin-left: auto; }
-    .msg-assistant { background: #161b22; }
-    .actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-    #spinner { display: none; width: 16px; height: 16px; border: 2px solid #30363d; border-top-color: #58a6ff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-left: 8px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .section-title { color: #58a6ff; font-size: 1rem; font-weight: 600; margin-bottom: 16px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      height: 100vh; display: flex; overflow: hidden;
+    }
+    button { font-family: inherit; cursor: pointer; }
+
+    /* ---------- Sidebar (left) ---------- */
+    .sidebar {
+      width: 260px; background: var(--sidebar); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; padding: 16px; gap: 14px; flex-shrink: 0;
+    }
+    .brand { font-family: Georgia, 'Times New Roman', serif; font-size: 1.3rem; font-weight: 600; }
+    .brand span { color: var(--accent); }
+    .new-chat {
+      background: var(--accent); color: #fff; border: none; border-radius: 10px;
+      padding: 10px; font-size: 0.95rem; font-weight: 600;
+    }
+    .new-chat:hover { background: var(--accent-hover); }
+    .side-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    #chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+    .chat-item {
+      text-align: left; background: none; border: none; color: var(--text);
+      padding: 8px 10px; border-radius: 8px; font-size: 0.88rem;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .chat-item:hover { background: var(--border); }
+    .chat-item.active { background: var(--border); font-weight: 600; }
+
+    .key-box { border-top: 1px solid var(--border); padding-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+    .key-box input {
+      width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--card); color: var(--text); font-size: 0.85rem; outline: none;
+    }
+    .key-box input:focus { border-color: var(--accent); }
+    .key-row { display: flex; gap: 6px; }
+    .small-btn {
+      flex: 1; padding: 7px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--card); color: var(--text); font-size: 0.82rem;
+    }
+    .small-btn:hover { border-color: var(--accent); }
+    #key-status { font-size: 0.78rem; color: var(--muted); }
+
+    /* ---------- Main chat area ---------- */
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    #messages { flex: 1; overflow-y: auto; padding: 32px 16px 16px; }
+    .column { max-width: 760px; margin: 0 auto; }
+
+    .welcome { text-align: center; margin-top: 18vh; }
+    .welcome h1 { font-family: Georgia, 'Times New Roman', serif; font-weight: 500; font-size: 2rem; margin-bottom: 10px; }
+    .welcome p { color: var(--muted); }
+
+    .msg { margin-bottom: 22px; display: flex; }
+    .msg.user { justify-content: flex-end; }
+    .msg.user .bubble {
+      background: var(--user-bubble); padding: 10px 16px; border-radius: 16px;
+      max-width: 80%; white-space: pre-wrap; line-height: 1.5;
+    }
+    .msg.assistant .bubble { width: 100%; line-height: 1.65; }
+
+    /* Report text (rendered Markdown) */
+    .report h1, .report h2, .report h3 { font-family: Georgia, 'Times New Roman', serif; font-weight: 600; margin: 18px 0 8px; }
+    .report h1 { font-size: 1.4rem; } .report h2 { font-size: 1.2rem; } .report h3 { font-size: 1.05rem; }
+    .report p { margin-bottom: 10px; }
+    .report ul, .report ol { margin: 0 0 10px 22px; }
+    .report li { margin-bottom: 4px; }
+    .report code { background: var(--user-bubble); padding: 1px 5px; border-radius: 4px; font-size: 0.88em; }
+    .report pre { background: var(--user-bubble); padding: 12px; border-radius: 8px; overflow-x: auto; margin-bottom: 10px; }
+    .report a { color: var(--accent); }
+
+    .thinking { color: var(--muted); display: flex; align-items: center; gap: 10px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.2s infinite ease-in-out; }
+    @keyframes pulse { 0%, 100% { opacity: 0.25; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
+
+    .notice { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); font-size: 0.92rem; }
+    .notice.blocked { border-color: var(--warn); color: var(--warn); }
+    .notice.error { border-color: var(--err); color: var(--err); }
+
+    .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .action-btn {
+      padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--card); color: var(--text); font-size: 0.82rem;
+    }
+    .action-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .diff-box {
+      margin-top: 12px; padding: 12px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--card); font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem;
+      white-space: pre-wrap; overflow-x: auto;
+    }
+    .diff-add { color: var(--ok); } .diff-del { color: var(--err); } .diff-meta { color: var(--muted); }
+
+    /* ---------- Input box (bottom) ---------- */
+    .composer-wrap { padding: 8px 16px 20px; }
+    .composer {
+      display: flex; align-items: flex-end; gap: 8px;
+      background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+      padding: 10px 10px 10px 16px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    }
+    .composer:focus-within { border-color: var(--accent); }
+    #topic {
+      flex: 1; border: none; outline: none; resize: none; background: transparent; color: var(--text);
+      font-family: inherit; font-size: 1rem; line-height: 1.5; max-height: 160px; padding: 4px 0;
+    }
+    #send-btn {
+      width: 36px; height: 36px; border-radius: 10px; border: none; flex-shrink: 0;
+      background: var(--accent); color: #fff; font-size: 1.1rem;
+    }
+    #send-btn:hover { background: var(--accent-hover); }
+    #send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .hint { text-align: center; font-size: 0.75rem; color: var(--muted); margin-top: 8px; }
+
+    /* ---------- Phone screens: sidebar goes on top ---------- */
+    @media (max-width: 760px) {
+      body { flex-direction: column; overflow: auto; height: auto; min-height: 100vh; }
+      .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+      #chat-list { max-height: 120px; }
+      .main { height: 80vh; }
+    }
+
+    /* ---------- Print = what "Save as PDF" fallback uses ---------- */
+    @media print {
+      .sidebar, .composer-wrap, .actions, .msg.user { display: none !important; }
+    }
   </style>
 </head>
 <body>
-  <h1>Research-Relay</h1>
-  <p class="subtitle">Powered by LangGraph · TensorZero · AWS Bedrock Guardrails</p>
 
-  <div class="card">
-    <div class="section-title">Authentication</div>
-    <div style="display:flex;gap:10px;align-items:flex-end">
-      <div style="flex:1">
-        <label>API Key</label>
-        <input type="password" id="api-key" placeholder="Enter your X-API-Key (saved in browser)">
-      </div>
-      <button class="btn btn-secondary" onclick="saveApiKey()" style="white-space:nowrap">Save Key</button>
-    </div>
-    <div id="key-status" style="font-size:0.8rem;color:#8b949e;margin-top:6px"></div>
-  </div>
+  <!-- ===== Sidebar ===== -->
+  <aside class="sidebar">
+    <div class="brand">Research<span>·</span>Relay</div>
+    <button class="new-chat" onclick="newChat()">+ New chat</button>
 
-  <div class="card">
-    <div class="section-title">New Research Job</div>
-    <div style="margin-bottom:16px">
-      <label>Research Topic</label>
-      <input type="text" id="topic" placeholder="e.g. Quantum computing advances in 2024">
-    </div>
-    <div class="row">
-      <div>
-        <label>Output Format</label>
-        <select id="format">
-          <option value="text">Plain Text</option>
-          <option value="pdf">PDF Export</option>
-          <option value="json">Structured JSON</option>
-        </select>
+    <div class="side-label">Recent chats</div>
+    <div id="chat-list"></div>
+
+    <div class="key-box">
+      <div class="side-label">API key</div>
+      <input type="password" id="api-key" placeholder="Paste your X-API-Key">
+      <div class="key-row">
+        <button class="small-btn" onclick="saveApiKey()">Save key</button>
+        <button class="small-btn" onclick="clearApiKey()">Forget key</button>
       </div>
-      <div>
-        <label>Session ID (optional)</label>
-        <input type="text" id="session-id" placeholder="Leave blank to auto-generate">
+      <div id="key-status"></div>
+    </div>
+  </aside>
+
+  <!-- ===== Main chat ===== -->
+  <main class="main">
+    <div id="messages"><div class="column" id="column"></div></div>
+
+    <div class="composer-wrap">
+      <div class="column">
+        <div class="composer">
+          <textarea id="topic" rows="1" placeholder="What should I research?"></textarea>
+          <button id="send-btn" onclick="sendTopic()" title="Send">&#8593;</button>
+        </div>
+        <div class="hint">Enter to send · Shift+Enter for a new line · Planner → Researcher → Summarizer → Writer</div>
       </div>
     </div>
-    <button class="btn" onclick="submitResearch()" id="submit-btn">
-      Start Research
-      <span id="spinner"></span>
-    </button>
-  </div>
-
-  <div class="card" id="result-card" style="display:none">
-    <div class="section-title">Result</div>
-    <div style="margin-bottom:12px">
-      <span id="job-status" class="status status-pending">Pending</span>
-      <span style="color:#8b949e;font-size:0.8rem;margin-left:10px" id="job-id-label"></span>
-    </div>
-    <div id="report-box" style="display:none"></div>
-    <div class="actions" id="export-actions" style="display:none">
-      <button class="btn btn-secondary" onclick="downloadPDF()">Download PDF</button>
-      <button class="btn btn-secondary" onclick="copyJSON()">Copy JSON</button>
-      <button class="btn btn-secondary" onclick="loadDiff()">Show Changes vs Previous</button>
-    </div>
-    <div id="diff-box" style="display:none;margin-top:14px"></div>
-  </div>
-
-  <div class="card">
-    <div class="section-title">Session History
-      <button class="btn btn-secondary" style="float:right;font-size:0.8rem;padding:4px 12px" onclick="newSession()">New Session</button>
-    </div>
-    <p style="color:#8b949e;font-size:0.8rem;margin-bottom:12px">Session ID is auto-reused across requests so history builds up. Click "New Session" to start fresh.</p>
-    <div id="session-box"><p style="color:#8b949e;font-size:0.85rem">No session active.</p></div>
-  </div>
+  </main>
 
   <script>
+    // Same page is served by the FastAPI app, so '' = "same server".
     const API = window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
-    let currentJobId = null;
-    let currentSessionId = null;
-    let pollInterval = null;
-    let lastReport = null;
-    let lastTopic = null;
+    const KEY_NAME = 'research_agent_api_key';   // same name as the old UI, so saved keys still work
+    const CHATS_NAME = 'research_relay_chats';
 
+    // A "chat" = one backend session. We keep the list in the browser so the sidebar survives a refresh.
+    // chat = { id: session_id or null, title, messages: [ {role:'user', text} | {role:'assistant', jobId, topic, status, report, error} ] }
+    let chats = loadChats();
+    let current = null;      // the chat on screen right now
+    let busy = false;        // true while a job is running
+
+    // ---------- Small helpers ----------
+    function loadChats() {
+      try { return JSON.parse(localStorage.getItem(CHATS_NAME)) || []; } catch (e) { return []; }
+    }
+    function saveChats() {
+      try { localStorage.setItem(CHATS_NAME, JSON.stringify(chats.slice(0, 30))); } catch (e) {}
+    }
     function getApiKey() {
-      return localStorage.getItem('research_agent_api_key') || '';
+      try { return localStorage.getItem(KEY_NAME) || ''; } catch (e) { return ''; }
     }
-
     function authHeaders() {
+      const headers = { 'Content-Type': 'application/json' };
       const key = getApiKey();
-      return key ? { 'Content-Type': 'application/json', 'X-API-Key': key }
-                 : { 'Content-Type': 'application/json' };
+      if (key) headers['X-API-Key'] = key;
+      return headers;
+    }
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    // Markdown -> safe HTML. If the CDN scripts didn't load, just show plain text.
+    function renderMarkdown(text) {
+      if (window.marked && window.DOMPurify) return DOMPurify.sanitize(marked.parse(text));
+      return '<p style="white-space:pre-wrap">' + escapeHtml(text) + '</p>';
+    }
+    function setKeyStatus(text, color) {
+      const el = document.getElementById('key-status');
+      el.textContent = text;
+      el.style.color = color || 'var(--muted)';
     }
 
+    // ---------- API key ----------
     function saveApiKey() {
       const key = document.getElementById('api-key').value.trim();
-      if (key) {
-        localStorage.setItem('research_agent_api_key', key);
-        document.getElementById('key-status').textContent = 'API key saved.';
-        document.getElementById('key-status').style.color = '#3fb950';
-      } else {
-        localStorage.removeItem('research_agent_api_key');
-        document.getElementById('key-status').textContent = 'API key cleared.';
-        document.getElementById('key-status').style.color = '#8b949e';
+      if (!key) {
+        // Empty Save does NOT wipe the saved key anymore (use "Forget key" for that)
+        setKeyStatus(getApiKey() ? 'Box is empty, so your saved key was kept.' : 'Type a key first.', 'var(--warn)');
+        return;
       }
+      localStorage.setItem(KEY_NAME, key);
+      document.getElementById('api-key').value = '';
+      setKeyStatus('Key saved in this browser.', 'var(--ok)');
+    }
+    function clearApiKey() {
+      localStorage.removeItem(KEY_NAME);
+      setKeyStatus('Key removed from this browser.');
     }
 
-    // Restore key indicator on load
-    window.addEventListener('DOMContentLoaded', () => {
-      if (getApiKey()) {
-        document.getElementById('key-status').textContent = 'API key loaded from browser storage.';
-        document.getElementById('key-status').style.color = '#3fb950';
+    // ---------- Chats ----------
+    function newChat() {
+      if (busy) return;
+      current = { id: null, title: 'New chat', messages: [] };
+      render();
+      document.getElementById('topic').focus();
+    }
+    function openChat(index) {
+      if (busy) return;
+      current = chats[index];
+      render();
+    }
+
+    function renderSidebar() {
+      const list = document.getElementById('chat-list');
+      list.innerHTML = '';
+      chats.forEach((chat, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'chat-item' + (chat === current ? ' active' : '');
+        btn.textContent = chat.title;
+        btn.onclick = () => openChat(i);
+        list.appendChild(btn);
+      });
+    }
+
+    function render() {
+      renderSidebar();
+      const col = document.getElementById('column');
+      if (!current || current.messages.length === 0) {
+        col.innerHTML = '<div class="welcome"><h1>What shall we research today?</h1>' +
+                        '<p>Type a topic below. Four agents will plan, search, summarize and write a report for you.</p></div>';
+        return;
       }
-    });
+      col.innerHTML = '';
+      current.messages.forEach(m => col.appendChild(messageElement(m)));
+      const box = document.getElementById('messages');
+      box.scrollTop = box.scrollHeight;
+    }
 
-    async function submitResearch() {
-      const topic = document.getElementById('topic').value.trim();
-      if (!topic) return alert('Please enter a research topic.');
-      const format = document.getElementById('format').value;
-      const sessionId = document.getElementById('session-id').value.trim();
+    // Builds the HTML for one message
+    function messageElement(m) {
+      const row = document.createElement('div');
+      row.className = 'msg ' + m.role;
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      row.appendChild(bubble);
 
-      document.getElementById('submit-btn').disabled = true;
-      document.getElementById('spinner').style.display = 'inline-block';
-      document.getElementById('result-card').style.display = 'block';
-      document.getElementById('job-status').className = 'status status-pending';
-      document.getElementById('job-status').textContent = 'Submitting...';
-      document.getElementById('report-box').style.display = 'none';
-      document.getElementById('export-actions').style.display = 'none';
-      document.getElementById('diff-box').style.display = 'none';
+      if (m.role === 'user') {
+        bubble.textContent = m.text;
+        return row;
+      }
+
+      if (m.status === 'pending') {
+        bubble.innerHTML = '<div class="thinking"><div class="dot"></div>Agents are researching… this can take a minute.</div>';
+      } else if (m.status === 'blocked') {
+        bubble.innerHTML = '<div class="notice blocked">Blocked by guardrails: ' + escapeHtml(m.error || '') + '</div>';
+      } else if (m.status === 'error') {
+        bubble.innerHTML = '<div class="notice error">Something went wrong: ' + escapeHtml(m.error || '') + '</div>';
+      } else {
+        // status === 'done' -> show the report + download buttons
+        bubble.innerHTML = '<div class="report">' + renderMarkdown(m.report) + '</div>';
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+        actions.appendChild(actionButton('Download PDF', () => downloadPDF(m)));
+        actions.appendChild(actionButton('Download JSON', () => downloadJSON(m)));
+        actions.appendChild(actionButton('Copy', () => copyReport(m)));
+        actions.appendChild(actionButton('Compare with previous', () => showDiff(m, bubble)));
+        bubble.appendChild(actions);
+      }
+      return row;
+    }
+    function actionButton(label, onClick) {
+      const b = document.createElement('button');
+      b.className = 'action-btn';
+      b.textContent = label;
+      b.onclick = onClick;
+      return b;
+    }
+
+    // ---------- Sending a topic ----------
+    async function sendTopic() {
+      const input = document.getElementById('topic');
+      const topic = input.value.trim();
+      if (!topic || busy) return;
+      if (!current) newChat();
+
+      busy = true;
+      document.getElementById('send-btn').disabled = true;
+      input.value = '';
+      autoGrow();
+
+      // First message of a chat becomes its title in the sidebar
+      if (current.messages.length === 0) {
+        current.title = topic.length > 40 ? topic.slice(0, 40) + '…' : topic;
+        chats.unshift(current);
+      }
+      current.messages.push({ role: 'user', text: topic });
+      const answer = { role: 'assistant', topic: topic, status: 'pending' };
+      current.messages.push(answer);
+      render();
 
       try {
         const resp = await fetch(`${API}/research`, {
           method: 'POST',
           headers: authHeaders(),
-          body: JSON.stringify({ topic, output_format: format, session_id: sessionId }),
+          body: JSON.stringify({ topic: topic, output_format: 'text', session_id: current.id || '' }),
         });
-        if (!resp.ok) {
-          const err = await resp.json();
-          throw new Error(err.detail || 'Request failed');
-        }
         const data = await resp.json();
-        currentJobId = data.job_id;
-        currentSessionId = data.session_id;
-        lastTopic = topic;
-        document.getElementById('session-id').value = currentSessionId;
-        document.getElementById('job-id-label').textContent = `Job: ${currentJobId}`;
-        document.getElementById('job-status').className = 'status status-pending';
-        document.getElementById('job-status').textContent = 'Processing...';
-        if (pollInterval) clearInterval(pollInterval);
-        pollInterval = setInterval(pollResult, 3000);
+        if (!resp.ok) throw new Error(data.detail || 'Request failed');
+
+        current.id = data.session_id;   // reuse the same session next time, so history builds up
+        answer.jobId = data.job_id;
+        const result = await waitForResult(data.job_id);
+
+        answer.status = result.status;
+        answer.report = result.report;
+        answer.error = result.error;
+        answer.createdAt = new Date().toISOString();
       } catch (e) {
-        document.getElementById('job-status').className = 'status status-error';
-        document.getElementById('job-status').textContent = `Error: ${e.message}`;
-        document.getElementById('submit-btn').disabled = false;
-        document.getElementById('spinner').style.display = 'none';
+        answer.status = 'error';
+        answer.error = e.message;
+      }
+
+      busy = false;
+      document.getElementById('send-btn').disabled = false;
+      saveChats();
+      render();
+    }
+
+    // Asks the server every 3 seconds: "is my job done yet?"
+    async function waitForResult(jobId) {
+      while (true) {
+        await new Promise(r => setTimeout(r, 3000));
+        try {
+          const resp = await fetch(`${API}/result/${jobId}`, { headers: authHeaders() });
+          const data = await resp.json();
+          if (!resp.ok) return { status: 'error', error: data.detail || 'Could not read result' };
+          if (data.status !== 'pending') return data;
+        } catch (e) {
+          console.error('Poll error', e);   // network blip -> just try again
+        }
       }
     }
 
-    async function pollResult() {
-      if (!currentJobId) return;
-      try {
-        const resp = await fetch(`${API}/result/${currentJobId}`, { headers: authHeaders() });
-        const data = await resp.json();
-        if (data.status === 'pending') return;
-        clearInterval(pollInterval);
-        document.getElementById('submit-btn').disabled = false;
-        document.getElementById('spinner').style.display = 'none';
-
-        if (data.status === 'done') {
-          lastReport = data;
-          document.getElementById('job-status').className = 'status status-done';
-          document.getElementById('job-status').textContent = 'Complete';
-          document.getElementById('report-box').textContent = data.report;
-          document.getElementById('report-box').style.display = 'block';
-          document.getElementById('export-actions').style.display = 'flex';
-          loadSession();
-        } else if (data.status === 'blocked') {
-          document.getElementById('job-status').className = 'status status-blocked';
-          document.getElementById('job-status').textContent = `Blocked: ${data.error}`;
-        } else {
-          document.getElementById('job-status').className = 'status status-error';
-          document.getElementById('job-status').textContent = `Error: ${data.error}`;
-        }
-      } catch (e) {
-        console.error('Poll error', e);
-      }
+    // ---------- Downloads ----------
+    function fileName(m, ext) {
+      const safe = m.topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 50) || 'report';
+      return `${safe}.${ext}`;
     }
-
-    async function downloadPDF() {
-      if (!currentJobId) return;
+    // Makes the browser save a Blob (file in memory) to disk
+    function saveBlob(blob, name) {
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = `${API}/result/${currentJobId}/pdf`;
-      a.download = `report-${currentJobId}.pdf`;
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
       a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
-    function copyJSON() {
-      if (!lastReport || !lastTopic) return;
-      const json = JSON.stringify({
-        report_id: currentJobId,
-        topic: lastTopic,
-        report: lastReport.report,
-        structured: lastReport.structured || null,
-      }, null, 2);
-      navigator.clipboard.writeText(json).then(() => alert('JSON copied to clipboard.'));
-    }
-
-    async function loadDiff() {
-      if (!lastTopic) return;
-      const resp = await fetch(`${API}/diff/${encodeURIComponent(lastTopic)}`, { headers: authHeaders() });
-      const data = await resp.json();
-      const box = document.getElementById('diff-box');
-      box.style.display = 'block';
-      const diff = data.diff || 'No previous report found.';
-      box.innerHTML = diff.split('\n').map(line => {
-        const esc = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        if (line.startsWith('+++') || line.startsWith('---')) return `<span style="color:#58a6ff;font-weight:600">${esc}</span>`;
-        if (line.startsWith('@@')) return `<span style="color:#d29922">${esc}</span>`;
-        if (line.startsWith('+')) return `<span class="diff-new">${esc}</span>`;
-        if (line.startsWith('-')) return `<span class="diff-removed">${esc}</span>`;
-        return `<span>${esc}</span>`;
-      }).join('\n');
-    }
-
-    async function loadSession() {
-      if (!currentSessionId) return;
-      const resp = await fetch(`${API}/session/${currentSessionId}`, { headers: authHeaders() });
-      const data = await resp.json();
-      const box = document.getElementById('session-box');
-      if (!data.messages || data.messages.length === 0) {
-        box.innerHTML = '<p style="color:#8b949e;font-size:0.85rem">No messages yet.</p>';
-        return;
+    // PDF is built on the server (reportlab). We use fetch so the API key header goes along.
+    async function downloadPDF(m) {
+      try {
+        const resp = await fetch(`${API}/result/${m.jobId}/pdf`, { headers: authHeaders() });
+        if (!resp.ok) throw new Error('server said ' + resp.status);
+        saveBlob(await resp.blob(), fileName(m, 'pdf'));
+      } catch (e) {
+        // Old jobs expire on the server. Fallback: browser print dialog -> "Save as PDF"
+        alert('Server PDF not available (' + e.message + '). The print window will open, choose "Save as PDF".');
+        printReport(m);
       }
-      box.innerHTML = data.messages.map(m =>
-        `<div class="msg msg-${m.role}"><strong style="text-transform:capitalize">${m.role}</strong>: ${m.content}</div>`
-      ).join('');
+    }
+    function printReport(m) {
+      const w = window.open('', '_blank');
+      w.document.write('<html><head><title>' + escapeHtml(m.topic) + '</title>' +
+        '<style>body{font-family:Georgia,serif;max-width:720px;margin:40px auto;line-height:1.6;color:#222}</style></head><body>' +
+        '<h1>' + escapeHtml(m.topic) + '</h1>' + renderMarkdown(m.report) + '</body></html>');
+      w.document.close();
+      w.focus();
+      w.print();
     }
 
-    function newSession() {
-      currentSessionId = null;
-      document.getElementById('session-id').value = '';
-      document.getElementById('session-box').innerHTML = '<p style="color:#8b949e;font-size:0.85rem">No session active.</p>';
+    // JSON is built right here in the browser, no server call needed
+    function downloadJSON(m) {
+      const data = {
+        job_id: m.jobId,
+        session_id: current.id,
+        topic: m.topic,
+        created_at: m.createdAt || null,
+        word_count: m.report.split(/\s+/).filter(Boolean).length,
+        report: m.report,
+      };
+      saveBlob(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), fileName(m, 'json'));
     }
+
+    function copyReport(m) {
+      navigator.clipboard.writeText(m.report);
+    }
+
+    // ---------- "Compare with previous" ----------
+    async function showDiff(m, bubble) {
+      let box = bubble.querySelector('.diff-box');
+      if (box) { box.remove(); return; }   // second click hides it
+      box = document.createElement('div');
+      box.className = 'diff-box';
+      box.textContent = 'Loading…';
+      bubble.appendChild(box);
+      try {
+        const resp = await fetch(`${API}/diff/${encodeURIComponent(m.topic)}`, { headers: authHeaders() });
+        const data = await resp.json();
+        const diff = data.diff || data.detail || 'No previous report found.';
+        box.innerHTML = diff.split('\n').map(line => {
+          const esc = escapeHtml(line);
+          if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('@@')) return `<span class="diff-meta">${esc}</span>`;
+          if (line.startsWith('+')) return `<span class="diff-add">${esc}</span>`;
+          if (line.startsWith('-')) return `<span class="diff-del">${esc}</span>`;
+          return esc;
+        }).join('\n');
+      } catch (e) {
+        box.textContent = 'Could not load changes: ' + e.message;
+      }
+    }
+
+    // ---------- Input box behaviour ----------
+    function autoGrow() {
+      const t = document.getElementById('topic');
+      t.style.height = 'auto';
+      t.style.height = Math.min(t.scrollHeight, 160) + 'px';
+    }
+    document.getElementById('topic').addEventListener('input', autoGrow);
+    document.getElementById('topic').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTopic(); }
+    });
+
+    // ---------- Start up ----------
+    // A job that was still "pending" when the page closed can't be resumed, so mark it.
+    chats.forEach(c => c.messages.forEach(m => {
+      if (m.status === 'pending') { m.status = 'error'; m.error = 'Page was closed before the report finished.'; }
+    }));
+    setKeyStatus(getApiKey() ? 'Key loaded from this browser.' : 'No key saved yet.', getApiKey() ? 'var(--ok)' : null);
+    newChat();
   </script>
 </body>
 </html>
