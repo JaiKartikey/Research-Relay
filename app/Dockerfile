@@ -4,6 +4,10 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev && rm -rf /var/lib/apt/lists/*
 
+# CPU-only PyTorch first. The default torch now pulls ~6 GB of NVIDIA CUDA packages on ARM,
+# which fills the EC2 disk; this instance has no GPU anyway.
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
