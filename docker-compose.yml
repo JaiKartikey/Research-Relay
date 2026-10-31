@@ -33,6 +33,18 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY}
     restart: unless-stopped
 
+  # Free DuckDNS name (e.g. research-relay.duckdns.org) -> this instance's new IP after every Start.
+  # Same image as the app (Docker reuses the build). Reads DUCKDNS_DOMAIN / DUCKDNS_TOKEN from
+  # Secrets Manager itself, through the instance role. If they are empty it just exits.
+  duckdns:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    command: ["python", "-m", "app.duckdns"]
+    environment:
+      AWS_REGION: ${AWS_REGION}
+    restart: on-failure
+
   # Semantic cache + session memory + job queue
   redis:
     image: redis:7-alpine
