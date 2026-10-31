@@ -1,8 +1,7 @@
 # All AWS infrastructure for Research-Relay EC2 (the cheap start/stop version), in one file.
 #
 #   cd terraform
-#   terraform init -backend-config="bucket=research-relay-tfstate-<YOUR_ACCOUNT_ID>"
-#   terraform apply
+#   ./tf.sh apply      (tf.sh = terraform + the CloudShell setup and init, see the README)
 #
 # What it makes:
 # - 1 small VPC with 1 public subnet

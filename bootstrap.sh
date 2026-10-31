@@ -26,6 +26,4 @@ aws s3api put-public-access-block --bucket "$BUCKET" --public-access-block-confi
 
 echo ""
 echo "Bootstrap complete. Next:"
-echo "  cd terraform && export TF_DATA_DIR=/tmp/tf"
-echo "  terraform init -backend-config=\"bucket=$BUCKET\""
-echo "  terraform apply"
+echo "  cd terraform && chmod +x tf.sh && ./tf.sh apply"

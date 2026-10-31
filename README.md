@@ -164,18 +164,11 @@ bash bootstrap.sh
 
 ```bash
 cd terraform
-export TF_DATA_DIR=/tmp/tf     # terraform's AWS plugin is ~800 MB, CloudShell's home folder is only 1 GB
-terraform init -backend-config="bucket=research-relay-tfstate-YOUR_ACCOUNT_ID"
-terraform apply
+chmod +x tf.sh     # one time only
+./tf.sh apply
 ```
 
-(`bootstrap.sh` printed your exact bucket name.)
-
-> **Every new CloudShell session**, before any `terraform` command (`apply`, `output`, `destroy`), run these two lines again inside the `terraform` folder. `/tmp` is wiped when CloudShell closes, but your state is safe in S3:
-> ```bash
-> export TF_DATA_DIR=/tmp/tf
-> terraform init -backend-config="bucket=research-relay-tfstate-YOUR_ACCOUNT_ID"
-> ```
+> **Always use `./tf.sh` instead of `terraform`** (for example `./tf.sh apply`, `./tf.sh output -raw api_key`, `./tf.sh destroy`). It finds your state bucket by itself and does the CloudShell setup (`TF_DATA_DIR`, `terraform init`) whenever CloudShell has wiped it, so you never type those again. Your state is always safe in S3.
 
 Type `yes`. Terraform takes ~2 minutes. At the end it prints something like:
 
@@ -202,7 +195,7 @@ Don't touch the other values (terraform filled them: Redis / database / TensorZe
 Your API key (the password for the app):
 
 ```bash
-terraform output -raw api_key
+./tf.sh output -raw api_key
 ```
 
 Copy it somewhere safe (a password manager).
@@ -285,8 +278,8 @@ curl -X POST -H "X-API-Key: your-key" -H "Content-Type: application/json" http:/
 | You want to… | Do this |
 |---|---|
 | Change a key (Gemini, Groq, LangSmith) | Edit the secret in Secrets Manager → **Reboot** the instance |
-| Change the code | Edit the files → put the new folder in CloudShell (step 1) → `cd terraform && terraform apply` (uploads the new zip) → **Reboot** the instance |
-| Allow only your own IP | `terraform apply -var="allowed_cidr=YOUR_IP/32"` (find your IP at https://checkip.amazonaws.com) |
+| Change the code | Edit the files → put the new folder in CloudShell (step 1) → `cd terraform && ./tf.sh apply` (uploads the new zip) → **Reboot** the instance |
+| Allow only your own IP | `./tf.sh apply -var="allowed_cidr=YOUR_IP/32"` (find your IP at https://checkip.amazonaws.com) |
 
 ---
 
@@ -338,7 +331,7 @@ In CloudShell:
 
 ```bash
 cd Research-Relay/terraform     # or Research-Relay-EC2/terraform if you uploaded the zip
-terraform destroy
+./tf.sh destroy
 ```
 
 Type `yes`. This deletes the instance **and its disk (your database)**, the secret, the guardrail and the code bucket. The S3 state bucket stays; delete it in the S3 console if you want. Also delete the budget if you no longer need it.
